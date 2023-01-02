@@ -1,7 +1,5 @@
 import fs from "fs";
 
-import "dotenv/config";
-
 const db_filename = process.env.DB_FILE;
 
 export default class DB {
@@ -40,16 +38,23 @@ export default class DB {
     }
   }
 
-  static fetchContactAll() {
+  static fetchContactAll(isPure = true, group = null) {
     if (this.existsDB) {
       try {
-        const data = fs.readFileSync(db_filename, "utf-8");
-        return JSON.parse(data);
+        const pureData = fs.readFileSync(db_filename, "utf-8");
+        const parsedData = JSON.parse(pureData);
+        const filteredData = isPure
+          ? parsedData
+          : parsedData.filter((c) => !c.deletedDate);
+        const filteredDataByGroup = group
+          ? filteredData.filter((c) => c.group === group)
+          : filteredData;
+        return filteredDataByGroup;
       } catch (err) {
-        throw new Error(`Sorry! can not read ${db_filename} file.`);
+        throw new Error(`Sorry! can not read databasae file.`);
       }
     } else {
-      throw new Error(`Sorry! ${db_filename} is not found!`);
+      throw new Error(`Sorry! databasae is not found!`);
     }
   }
 
@@ -95,58 +100,88 @@ export default class DB {
     return contact ? contact : false;
   }
 
-  static saveContact(name = null, phone = null) {
-    if (!name || !phone) return;
+  static saveContact(name = null, phone = null, group = null) {
+    if (!name || !phone || !group) return;
 
     const list = this.fetchContactAll();
-    let id = list.length ? list[list.length - 1].id + 1 : 1;
-    list.push({ id, name, phone });
-    list.sort((a, b) => a.id - b.id);
+    const isConatctExists = this.fetchContactByPhone(phone);
 
-    try {
-      fs.writeFileSync(db_filename, JSON.stringify(list, null, "  "), "utf-8");
-    } catch (err) {
-      throw new Error("Sorry! can not save this contact.");
+    if (!isConatctExists) {
+      let id = list.length ? list[list.length - 1].id + 1 : 1;
+      list.push({
+        id,
+        name,
+        phone,
+        group,
+        creationDate: new Date(),
+        deletedDate: null,
+      });
+      list.sort((a, b) => a.id - b.id);
+
+      try {
+        fs.writeFileSync(
+          db_filename,
+          JSON.stringify(list, null, "  "),
+          "utf-8"
+        );
+      } catch (err) {
+        throw new Error("Sorry! can not save this contact.");
+      }
+    } else {
+      throw new Error("Sorry! phone number is exist in Database file.");
     }
   }
 
-  static updateContact(id = null, name = null, phone = null) {
+  static updateContact(
+    id = null,
+    name = null,
+    phone = null,
+    deletedDate = null
+  ) {
     if (!id) return;
 
     const list = this.fetchContactAll();
-    const item = this.fetchContactById(id);
+    const isConatctExists = this.fetchContactByPhone(phone);
 
-    if (item) {
-      let newList = list.filter((c) => c.id !== id);
-      let newItem = {
-        id,
-        name: name ? name : item?.name,
-        phone: phone ? phone : item?.phone,
-      };
-      newList.push(newItem);
-      newList.sort((a, b) => a.id - b.id);
+    if (!isConatctExists) {
+      const item = this.fetchContactById(id);
 
-      try {
-        fs.writeFileSync(db_filename, JSON.stringify(newList), "utf-8");
-      } catch (err) {
-        throw new Error("Sorry! can not update this contact.");
+      if (item) {
+        let newList = list.filter((c) => c.id !== id);
+        let newItem = {
+          ...item,
+          name: name ? name : item?.name,
+          phone: phone ? phone : item?.phone,
+          deletedDate: deletedDate ? deletedDate : item?.deletedDate,
+        };
+        newList.push(newItem);
+        newList.sort((a, b) => a.id - b.id);
+
+        try {
+          fs.writeFileSync(
+            db_filename,
+            JSON.stringify(newList, null, "  "),
+            "utf-8"
+          );
+        } catch (err) {
+          throw new Error("Sorry! can not update this contact.");
+        }
+      } else {
+        return false;
       }
     } else {
-      return false;
+      throw new Error("Sorry! phone number is exist in Database file.");
     }
   }
 
   static deleteContact(id) {
     if (!id) return;
 
-    const list = this.fetchContactAll();
     const item = this.fetchContactById(id);
 
     if (item) {
-      let newList = list.filter((c) => c.id !== id);
-
       try {
-        fs.writeFileSync(db_filename, JSON.stringify(newList), "utf-8");
+        this.updateContact(id, null, null, new Date());
       } catch (err) {
         throw new Error("Sorry! can not delete this contact.");
       }

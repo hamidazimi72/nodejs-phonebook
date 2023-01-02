@@ -8,10 +8,12 @@ export default class Contact {
   #id = 0;
   #name;
   #phone;
+  #group;
 
-  constructor(name, phone) {
+  constructor(name, phone, group) {
     this.name = name;
     this.phone = phone;
+    this.group = group;
   }
 
   get id() {
@@ -40,31 +42,50 @@ export default class Contact {
     this.#phone = value;
   }
 
+  get group() {
+    return this.#group;
+  }
+
+  set group(value) {
+    this.#group = value;
+  }
+
   [util.inspect.custom]() {
     return `Contact {
       id: ${chalk.yellowBright(this.#id)},
       name: ${chalk.green(`"${this.#name}"`)},
-      phone: ${chalk.blue(this.#phone)}
+      phone: ${chalk.blue(this.#phone)},
+      group: ${chalk.blue(this.#group)}
     }`;
   }
 
   save() {
     try {
-      DB.saveContact(this.#name, this.#phone);
+      DB.saveContact(this.#name, this.#phone, this.#group);
       return true;
     } catch (err) {
       throw new Error(err.message);
     }
   }
 
-  static fetchAll(isPureObject = true) {
-    const list = DB.fetchContactAll();
+  static fetchAll(isObjectFormat = true) {
+    const pureList = DB.fetchContactAll(false);
+    const filteredList = pureList.map((c) => ({
+      name: c?.name,
+      phone: c?.phone,
+      group: c?.group ?? "-",
+      date: `${new Date(c?.creationDate).getMonth() + 1}/${new Date(
+        c?.creationDate
+      ).getDate()}/${new Date(c?.creationDate).getFullYear()} - ${new Date(
+        c?.creationDate
+      ).getHours()}:${new Date(c?.creationDate).getMinutes()}`,
+    }));
 
-    if (isPureObject) {
-      return list;
+    if (isObjectFormat) {
+      return filteredList;
     } else {
       let items = [];
-      for (const contact of list) {
+      for (const contact of filteredList) {
         let item = new Contact(contact?.name, contact?.phone);
         item.#id = contact?.id;
         items.push(item);

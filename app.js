@@ -33,6 +33,12 @@ inquirer
       case "edit":
         Actions.edit();
         break;
+      case "delete":
+        Actions.remove();
+        break;
+      case "delete-all":
+        Actions.removeAll();
+        break;
 
       default:
         break;
